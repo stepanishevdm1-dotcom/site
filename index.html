@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Звуковая Кнопка</title>
+    <style>
+        body { font-family: Arial; text-align: center; padding: 20px; }
+        .container { max-width: 400px; margin: 0 auto; }
+        input, button { 
+            padding: 12px; 
+            margin: 10px; 
+            width: 80%; 
+            font-size: 16px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+        }
+        #sendBtn { 
+            background: #4CAF50; 
+            color: white; 
+            border: none;
+            font-size: 20px;
+            padding: 20px;
+            cursor: pointer;
+        }
+        #sendBtn:disabled { background: #cccccc; }
+        #recordBtn { background: #f44336; color: white; }
+        #stopBtn { background: #ff9800; color: white; }
+        .status { margin: 10px; padding: 10px; }
+    </style>
+    <!-- Подключаем Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h2>🔊 Звуковая Кнопка</h2>
+        
+        <div id="setup">
+            <input type="text" id="roomCode" placeholder="Введите код комнаты (например: 1234)">
+            <button onclick="joinRoom()">Присоединиться</button>
+        </div>
+        
+        <div id="room" style="display:none;">
+            <p>Комната: <strong id="currentRoom"></strong></p>
+            
+            <div class="status" id="status">Ожидание...</div>
+            
+            <!-- Кнопка сигнала -->
+            <button id="sendBtn" onclick="sendSignal()" disabled>🔔 ОТПРАВИТЬ СИГНАЛ</button>
+            
+            <!-- Голосовые сообщения -->
+            <h3>Голосовое сообщение:</h3>
+            <button id="recordBtn" onclick="startRecording()">🎤 Записать</button>
+            <button id="stopBtn" onclick="stopRecording()" disabled>⏹️ Остановить</button>
+            <audio id="audioPlayback" controls style="width:100%; margin-top:10px;"></audio>
+            
+            <p><small>Обновите страницу, чтобы сменить комнату</small></p>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
