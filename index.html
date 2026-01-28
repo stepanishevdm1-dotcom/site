@@ -1,121 +1,196 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Отправитель / Приёмник</title>
+    <title>GitHub Sound Button</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f5f5f5; }
-        .container { max-width: 500px; margin: 0 auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        h2 { color: #333; margin-bottom: 25px; }
-        .role-btn { 
-            display: block; 
-            width: 100%; 
-            padding: 25px; 
-            margin: 15px 0; 
-            font-size: 20px; 
-            border: none; 
-            border-radius: 10px; 
+        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f0f8ff; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
+        h2 { color: #2c3e50; margin-bottom: 10px; }
+        h3 { color: #34495e; margin: 20px 0 10px; }
+        
+        .role-btn {
+            display: block;
+            width: 100%;
+            padding: 25px;
+            margin: 15px 0;
+            font-size: 22px;
+            border: none;
+            border-radius: 12px;
             cursor: pointer;
             color: white;
             font-weight: bold;
-            transition: transform 0.2s;
+            transition: all 0.3s;
         }
-        .role-btn:hover { transform: scale(1.02); }
-        #senderBtn { background: linear-gradient(135deg, #4CAF50, #2E7D32); }
-        #receiverBtn { background: linear-gradient(135deg, #2196F3, #0D47A1); }
+        .role-btn:hover { transform: scale(1.02); opacity: 0.9; }
+        #senderBtn { background: linear-gradient(135deg, #3498db, #2980b9); }
+        #receiverBtn { background: linear-gradient(135deg, #2ecc71, #27ae60); }
+        
         .hidden { display: none; }
-        #signalBtn { 
-            font-size: 28px; 
-            padding: 30px; 
-            background: linear-gradient(135deg, #FF5722, #D84315);
+        
+        .sound-btn {
+            padding: 18px;
+            margin: 8px;
+            width: 45%;
+            background: linear-gradient(135deg, #9b59b6, #8e44ad);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.2s;
+        }
+        .sound-btn:hover { background: linear-gradient(135deg, #8e44ad, #732d91); transform: translateY(-2px); }
+        
+        #sendButton {
+            padding: 25px 40px;
+            font-size: 24px;
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
             color: white;
             border: none;
             border-radius: 50%;
-            width: 150px;
-            height: 150px;
-            margin: 30px auto;
+            width: 120px;
+            height: 120px;
+            margin: 25px auto;
             cursor: pointer;
-            box-shadow: 0 10px 20px rgba(255,87,34,0.3);
+            display: block;
+            box-shadow: 0 8px 15px rgba(231, 76, 60, 0.3);
         }
-        #signalBtn:disabled { background: #cccccc; }
-        #status { 
-            margin: 20px; 
-            padding: 15px; 
+        
+        .status-box {
+            padding: 15px;
+            margin: 20px 0;
             border-radius: 10px;
-            font-size: 16px;
+            background: #ecf0f1;
+            border-left: 5px solid #3498db;
+            text-align: left;
         }
-        .sender-status { background: #E8F5E9; border-left: 5px solid #4CAF50; }
-        .receiver-status { background: #E3F2FD; border-left: 5px solid #2196F3; }
-        audio { width: 100%; margin-top: 20px; }
-        .room-code { 
-            padding: 15px; 
-            font-size: 24px; 
-            font-weight: bold; 
-            background: #f8f8f8; 
+        
+        audio { width: 100%; margin: 15px 0; border-radius: 10px; }
+        
+        .setup-box {
+            background: #fffde7;
+            padding: 20px;
             border-radius: 10px;
             margin: 20px 0;
-            letter-spacing: 3px;
+            border: 2px dashed #f39c12;
+        }
+        
+        input {
+            padding: 15px;
+            width: 80%;
+            font-size: 18px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        
+        select {
+            padding: 12px;
+            font-size: 16px;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            margin: 10px;
+            width: 80%;
         }
     </style>
-    <!-- Подключаем Firebase -->
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
 </head>
 <body>
     <div class="container">
-        <h2>🔊 Отправитель и Приёмник</h2>
+        <h2>🔊 GitHub Sound Messenger</h2>
+        <p>Работает через GitHub Gist API (задержка 5-10 секунд)</p>
         
         <div id="roleSelection">
             <h3>Выберите роль:</h3>
             <button class="role-btn" onclick="selectRole('sender')" id="senderBtn">
                 📤 ОТПРАВИТЕЛЬ<br>
-                <small>(Кнопка + микрофон)</small>
+                <small>Кнопка + выбор звука</small>
             </button>
             
             <button class="role-btn" onclick="selectRole('receiver')" id="receiverBtn">
                 📥 ПРИЁМНИК<br>
-                <small>(Только динамик)</small>
+                <small>Только прослушивание</small>
             </button>
         </div>
         
-        <div id="roomSelection" class="hidden">
-            <h3>Введите код комнаты:</h3>
-            <input type="text" id="roomCodeInput" placeholder="Например: 1234" maxlength="10" style="padding: 15px; font-size: 18px; width: 80%;">
-            <br><br>
-            <button onclick="joinRoom()" style="padding: 15px 30px; font-size: 18px; background: #666; color: white; border: none; border-radius: 8px;">
-                Подключиться
-            </button>
+        <!-- НАСТРОЙКА КОМНАТЫ -->
+        <div id="roomSetup" class="hidden">
+            <div class="setup-box">
+                <h3>Настройка комнаты</h3>
+                <p>⚠️ Вам нужен GitHub Personal Access Token</p>
+                <ol style="text-align: left; padding-left: 20px;">
+                    <li>Зайдите на <a href="https://github.com/settings/tokens" target="_blank">GitHub Tokens</a></li>
+                    <li>Нажмите "Generate new token (classic)"</li>
+                    <li>Отметьте "gist" и нажмите "Generate"</li>
+                    <li>Скопируйте токен и вставьте ниже</li>
+                </ol>
+                
+                <input type="text" id="githubToken" placeholder="Ваш GitHub Token (начинается с ghp_)">
+                <br>
+                <input type="text" id="roomCode" placeholder="Код комнаты (например: sound123)" value="sound123">
+                <br><br>
+                <button onclick="joinRoom()" style="padding: 15px 30px; background: #2ecc71; color: white; border: none; border-radius: 8px; font-size: 18px;">
+                    Подключиться к комнате
+                </button>
+            </div>
         </div>
         
-        <!-- ОТПРАВИТЕЛЬ -->
+        <!-- ИНТЕРФЕЙС ОТПРАВИТЕЛЯ -->
         <div id="senderInterface" class="hidden">
-            <div class="room-code">Комната: <span id="senderRoomCode">-</span></div>
-            <div id="status" class="sender-status">✅ Подключён как Отправитель</div>
+            <div class="status-box">
+                <strong>📤 ОТПРАВИТЕЛЬ</strong><br>
+                Комната: <span id="senderRoomCode" style="font-weight:bold;">-</span><br>
+                <span id="senderStatus">Готов к отправке</span>
+            </div>
             
-            <button id="signalBtn" onclick="startRecording()">
-                🎤<br>Говорить
-            </button>
+            <h3>Выберите звук:</h3>
+            <div id="soundSelection">
+                <button class="sound-btn" onclick="selectSound('bell')">🔔 Звонок</button>
+                <button class="sound-btn" onclick="selectSound('alert')">🚨 Тревога</button>
+                <button class="sound-btn" onclick="selectSound('message')">📬 Сообщение</button>
+                <button class="sound-btn" onclick="selectSound('success')">✅ Успех</button>
+                <button class="sound-btn" onclick="selectSound('notify')">📢 Уведомление</button>
+                <button class="sound-btn" onclick="selectSound('horn')">📯 Горн</button>
+            </div>
             
-            <p>Нажмите и удерживайте кнопку для записи голоса</p>
+            <p>Выбран: <strong id="selectedSoundName">🔔 Звонок</strong></p>
             
-            <div id="recordingStatus" style="color: #FF5722; font-weight: bold; margin: 20px;"></div>
+            <button id="sendButton" onclick="sendSound()">ОТПРАВИТЬ</button>
+            
+            <div style="margin-top: 30px; padding: 15px; background: #e8f4f8; border-radius: 10px;">
+                <strong>Как работает:</strong><br>
+                1. Выберите звук → 2. Нажмите кнопку → 3. Звук сохраняется в GitHub Gist<br>
+                4. Приёмник автоматически обнаружит и воспроизведёт его
+            </div>
         </div>
         
-        <!-- ПРИЁМНИК -->
+        <!-- ИНТЕРФЕЙС ПРИЁМНИКА -->
         <div id="receiverInterface" class="hidden">
-            <div class="room-code">Комната: <span id="receiverRoomCode">-</span></div>
-            <div id="status" class="receiver-status">✅ Подключён как Приёмник</div>
+            <div class="status-box">
+                <strong>📥 ПРИЁМНИК</strong><br>
+                Комната: <span id="receiverRoomCode" style="font-weight:bold;">-</span><br>
+                <span id="receiverStatus">Слушаю обновления...</span>
+            </div>
             
-            <h3>📢 Голосовые сообщения:</h3>
-            <audio id="receiverAudio" controls autoplay></audio>
-            <p id="messageStatus">Ожидание сообщений...</p>
+            <h3>📢 Полученные звуки:</h3>
+            <audio id="receivedAudio" controls></audio>
+            <div id="lastMessage"></div>
             
-            <div style="margin-top: 30px; padding: 15px; background: #FFF3E0; border-radius: 10px;">
+            <div style="margin-top: 30px; padding: 15px; background: #e8f5e9; border-radius: 10px;">
                 <strong>Режим:</strong> Только прослушивание<br>
-                <small>Микрофон не используется</small>
+                <small>Микрофон не используется, динамик воспроизводит полученные звуки</small><br><br>
+                🔄 Автопроверка каждые 5 секунд
             </div>
         </div>
     </div>
+
+    <!-- ЗВУКИ (скрытые) -->
+    <audio id="sound-bell" src="https://assets.mixkit.co/sfx/preview/mixkit-bell-notification-933.mp3" preload="auto"></audio>
+    <audio id="sound-alert" src="https://assets.mixkit.co/sfx/preview/mixkit-retro-game-emergency-alarm-1000.mp3" preload="auto"></audio>
+    <audio id="sound-message" src="https://assets.mixkit.co/sfx/preview/mixkit-message-pop-alert-2354.mp3" preload="auto"></audio>
+    <audio id="sound-success" src="https://assets.mixkit.co/sfx/preview/mixkit-winning-chimes-2015.mp3" preload="auto"></audio>
+    <audio id="sound-notify" src="https://assets.mixkit.co/sfx/preview/mixkit-correct-answer-tone-2870.mp3" preload="auto"></audio>
+    <audio id="sound-horn" src="https://assets.mixkit.co/sfx/preview/mixkit-car-horn-718.mp3" preload="auto"></audio>
 
     <script src="script.js"></script>
 </body>
