@@ -1,200 +1,117 @@
-// Глобальные переменные
+// Конфигурация Firebase (ЗАМЕНИТЕ на свою!)
+const firebaseConfig = {
+    apiKey: "AIzaSyBq_07JyLmJgC3hNvK5Qd7W6qX2Z1Y8abcd",
+    authDomain: "soundbutton-12345.firebaseapp.com",
+    databaseURL: "https://soundbutton-12345-default-rtdb.firebaseio.com",
+    projectId: "soundbutton-12345",
+    storageBucket: "soundbutton-12345.appspot.com",
+    messagingSenderId: "123456789012",
+    appId: "1:123456789012:web:abcdef1234567890"
+};
+
+// Инициализация Firebase
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+
+let currentRole = null;
 let currentRoom = null;
-let peerConnection = null;
-let dataChannel = null;
 let mediaRecorder = null;
 let audioChunks = [];
 let localStream = null;
+let isRecording = false;
 
-// Функция для создания или присоединения к комнате
-async function createOrJoinRoom() {
-    const roomCode = document.getElementById('roomCode').value.trim();
+// Выбор роли
+function selectRole(role) {
+    currentRole = role;
+    document.getElementById('roleSelection').classList.add('hidden');
+    document.getElementById('roomSelection').classList.remove('hidden');
+    
+    if (role === 'sender') {
+        // Запрашиваем доступ к микрофону заранее
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(stream => {
+                localStream = stream;
+                console.log("Микрофон доступен");
+            })
+            .catch(err => {
+                console.error("Ошибка микрофона:", err);
+                alert("Разрешите доступ к микрофону!");
+            });
+    }
+}
+
+// Подключиться к комнате
+function joinRoom() {
+    const roomCode = document.getElementById('roomCodeInput').value.trim();
     if (!roomCode) {
         alert('Введите код комнаты!');
         return;
     }
     
     currentRoom = roomCode;
-    document.getElementById('currentRoom').textContent = roomCode;
-    document.getElementById('setup').style.display = 'none';
-    document.getElementById('room').style.display = 'block';
+    document.getElementById('roomSelection').classList.add('hidden');
     
-    // Пытаемся установить P2P соединение
-    await initPeerConnection();
-}
-
-// Инициализация P2P соединения (WebRTC)
-async function initPeerConnection() {
-    try {
-        // Создаём PeerConnection с STUN серверами (помогают с подключением)
-        const configuration = {
-            iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' }
-            ]
-        };
-        
-        peerConnection = new RTCPeerConnection(configuration);
-        
-        // Создаём канал данных для обмена сообщениями
-        dataChannel = peerConnection.createDataChannel('signaling');
-        
-        // Обработчики событий канала данных
-        dataChannel.onopen = () => {
-            document.getElementById('status').innerHTML = '✅ Соединение установлено!';
-            document.getElementById('signalBtn').disabled = false;
-            console.log('Канал данных открыт');
-        };
-        
-        dataChannel.onmessage = (event) => {
-            const message = JSON.parse(event.data);
-            handleReceivedMessage(message);
-        };
-        
-        dataChannel.onerror = (error) => {
-            console.error('Ошибка канала данных:', error);
-            document.getElementById('status').innerHTML = '❌ Ошибка соединения';
-        };
-        
-        // Получаем доступ к микрофону для голосовых сообщений
-        try {
-            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            
-            // Добавляем поток в соединение (для будущих расширений)
-            localStream.getTracks().forEach(track => {
-                peerConnection.addTrack(track, localStream);
-            });
-        } catch (err) {
-            console.log('Микрофон недоступен, но сигналы будут работать');
-        }
-        
-        // Создаём предложение (offer)
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-        
-        // В реальном приложении здесь нужно отправить offer через сервер-сигналинг
-        // Но для простоты мы сэмулируем это локально
-        setTimeout(() => simulateSignaling(offer), 500);
-        
-    } catch (error) {
-        console.error('Ошибка инициализации:', error);
-        document.getElementById('status').innerHTML = '❌ Не удалось установить соединение';
+    if (currentRole === 'sender') {
+        document.getElementById('senderInterface').classList.remove('hidden');
+        document.getElementById('senderRoomCode').textContent = roomCode;
+        setupSender();
+    } else {
+        document.getElementById('receiverInterface').classList.remove('hidden');
+        document.getElementById('receiverRoomCode').textContent = roomCode;
+        setupReceiver();
     }
 }
 
-// Эмуляция обмена сигналами (в реальном приложении нужен сервер)
-function simulateSignaling(offer) {
-    // В реальном приложении здесь должен быть AJAX запрос к серверу
-    // Но для демонстрации мы просто создаём ответ локально
-    setTimeout(async () => {
-        try {
-            const peerConnection2 = new RTCPeerConnection({
-                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+// Настройка отправителя
+function setupSender() {
+    // Слушаем подтверждения доставки
+    database.ref('rooms/' + currentRoom + '/delivery').on('value', (snapshot) => {
+        if (snapshot.exists()) {
+            const data = snapshot.val();
+            if (data.type === 'received') {
+                document.getElementById('recordingStatus').innerHTML = 
+                    '✅ Сообщение доставлено! ' + new Date().toLocaleTimeString();
+            }
+        }
+    });
+}
+
+// Настройка приёмника
+function setupReceiver() {
+    // Слушаем входящие голосовые сообщения
+    database.ref('rooms/' + currentRoom + '/audio').on('value', (snapshot) => {
+        if (snapshot.exists()) {
+            const audioData = snapshot.val();
+            playAudioMessage(audioData);
+            
+            // Подтверждаем получение
+            database.ref('rooms/' + currentRoom + '/delivery').set({
+                type: 'received',
+                timestamp: Date.now(),
+                from: audioData.senderId
             });
             
-            // Обработчик входящего канала данных
-            peerConnection2.ondatachannel = (event) => {
-                const dataChannel2 = event.channel;
-                dataChannel2.onopen = () => {
-                    console.log('Второй канал открыт');
-                    
-                    // Отправляем тестовое сообщение
-                    setTimeout(() => {
-                        dataChannel2.send(JSON.stringify({ type: 'connected' }));
-                    }, 200);
-                };
-                
-                dataChannel2.onmessage = (event) => {
-                    const message = JSON.parse(event.data);
-                    // Здесь второй клиент получит сообщения
-                    console.log('Второй клиент получил:', message);
-                };
-            };
-            
-            await peerConnection2.setRemoteDescription(offer);
-            const answer = await peerConnection2.createAnswer();
-            await peerConnection2.setLocalDescription(answer);
-            
-            // Завершаем соединение
-            await peerConnection.setRemoteDescription(answer);
-            
-        } catch (error) {
-            console.error('Ошибка эмуляции:', error);
-            document.getElementById('status').innerHTML = '⚠️ Соединение в тестовом режиме';
+            // Удаляем подтверждение через 2 секунды
+            setTimeout(() => {
+                database.ref('rooms/' + currentRoom + '/delivery').remove();
+            }, 2000);
         }
-    }, 1000);
+    });
 }
 
-// Обработка полученных сообщений
-function handleReceivedMessage(message) {
-    switch (message.type) {
-        case 'signal':
-            playSignalSound();
-            document.getElementById('status').innerHTML = 
-                `🔔 Сигнал получен! ${new Date().toLocaleTimeString()}`;
-            break;
-            
-        case 'audio':
-            playAudioMessage(message.data);
-            document.getElementById('audioStatus').textContent = 
-                `🔊 Голосовое сообщение получено ${new Date().toLocaleTimeString()}`;
-            break;
-            
-        case 'connected':
-            document.getElementById('status').innerHTML = '✅ Соединение установлено!';
-            document.getElementById('signalBtn').disabled = false;
-            break;
-    }
-}
-
-// Отправка сигнала
-function sendSignal() {
-    if (!dataChannel || dataChannel.readyState !== 'open') {
-        alert('Соединение не установлено');
+// Начать запись (для отправителя)
+function startRecording() {
+    if (!localStream) {
+        alert('Микрофон не доступен!');
         return;
     }
     
-    const message = { type: 'signal', timestamp: Date.now() };
-    dataChannel.send(JSON.stringify(message));
+    isRecording = true;
+    document.getElementById('signalBtn').innerHTML = '🎤<br>Говорите...';
+    document.getElementById('signalBtn').style.background = 'linear-gradient(135deg, #F44336, #B71C1C)';
+    document.getElementById('recordingStatus').innerHTML = '● Запись... Отпустите кнопку';
     
-    document.getElementById('status').innerHTML = 
-        `✅ Сигнал отправлен! ${new Date().toLocaleTimeString()}`;
-}
-
-// Воспроизведение звука сигнала
-function playSignalSound() {
-    try {
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        
-        oscillator.frequency.value = 800;
-        oscillator.type = 'sine';
-        
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-        
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.5);
-    } catch (e) {
-        console.log('Аудио контекст не поддерживается');
-    }
-}
-
-// Запись голосового сообщения
-async function startRecording() {
-    if (!localStream) {
-        try {
-            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        } catch (err) {
-            alert('Не удалось получить доступ к микрофону');
-            return;
-        }
-    }
-    
+    // Начинаем запись
     mediaRecorder = new MediaRecorder(localStream);
     audioChunks = [];
     
@@ -205,57 +122,98 @@ async function startRecording() {
     };
     
     mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-        sendAudioMessage(audioBlob);
+        if (audioChunks.length > 0) {
+            sendAudioMessage();
+        }
+        resetButton();
     };
     
     mediaRecorder.start();
-    document.getElementById('recordBtn').disabled = true;
-    document.getElementById('stopBtn').disabled = false;
-    document.getElementById('audioStatus').textContent = '🎤 Запись...';
+    
+    // Меняем кнопку на "отпустите"
+    const signalBtn = document.getElementById('signalBtn');
+    signalBtn.onmouseup = signalBtn.ontouchend = stopRecording;
+    signalBtn.onmouseleave = stopRecording;
 }
 
-// Остановка записи
+// Остановить запись
 function stopRecording() {
     if (mediaRecorder && mediaRecorder.state === 'recording') {
         mediaRecorder.stop();
-        document.getElementById('recordBtn').disabled = false;
-        document.getElementById('stopBtn').disabled = true;
-        document.getElementById('audioStatus').textContent = 'Обработка...';
+        isRecording = false;
     }
 }
 
-// Отправка голосового сообщения
-function sendAudioMessage(audioBlob) {
-    if (!dataChannel || dataChannel.readyState !== 'open') {
-        alert('Соединение не установлено для отправки аудио');
-        return;
-    }
+// Сброс кнопки
+function resetButton() {
+    document.getElementById('signalBtn').innerHTML = '🎤<br>Говорить';
+    document.getElementById('signalBtn').style.background = 'linear-gradient(135deg, #FF5722, #D84315)';
+    
+    const signalBtn = document.getElementById('signalBtn');
+    signalBtn.onmouseup = signalBtn.ontouchend = null;
+    signalBtn.onmouseleave = null;
+}
+
+// Отправить голосовое сообщение
+function sendAudioMessage() {
+    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
     
     const reader = new FileReader();
     reader.readAsDataURL(audioBlob);
     reader.onloadend = function() {
         const base64Audio = reader.result;
-        const message = { type: 'audio', data: base64Audio };
         
-        // Отправляем через канал данных
-        dataChannel.send(JSON.stringify(message));
-        
-        // Также воспроизводим локально
-        playAudioMessage(base64Audio);
-        
-        document.getElementById('audioStatus').textContent = '✅ Голосовое отправлено!';
-    };
-}
-
-// Воспроизведение голосового сообщения
-function playAudioMessage(base64Audio) {
-    const audioElement = document.getElementById('receivedAudio');
-    audioElement.src = base64Audio;
-    
-    audioElement.onloadeddata = () => {
-        audioElement.play().catch(e => {
-            console.log('Автовоспроизведение заблокировано');
+        // Отправляем в Firebase
+        database.ref('rooms/' + currentRoom + '/audio').set({
+            data: base64Audio,
+            timestamp: Date.now(),
+            senderId: generateId(),
+            duration: audioBlob.size
+        }).then(() => {
+            document.getElementById('recordingStatus').innerHTML = '⏳ Отправка...';
+            
+            // Очищаем через 5 секунд
+            setTimeout(() => {
+                database.ref('rooms/' + currentRoom + '/audio').remove();
+            }, 5000);
         });
     };
 }
+
+// Воспроизвести сообщение (для приёмника)
+function playAudioMessage(audioData) {
+    const audioElement = document.getElementById('receiverAudio');
+    audioElement.src = audioData.data;
+    
+    document.getElementById('messageStatus').innerHTML = 
+        '🔔 Новое сообщение! ' + new Date().toLocaleTimeString();
+    
+    // Автовоспроизведение
+    audioElement.onloadeddata = function() {
+        audioElement.play().catch(e => {
+            // Если автовоспроизведение заблокировано
+            document.getElementById('messageStatus').innerHTML += 
+                '<br>Нажмите play для прослушивания';
+        });
+    };
+}
+
+// Генератор ID
+function generateId() {
+    return Math.random().toString(36).substr(2, 9);
+}
+
+// Обработка касаний на мобильных
+document.getElementById('signalBtn').addEventListener('touchstart', function(e) {
+    if (currentRole === 'sender' && !isRecording) {
+        e.preventDefault();
+        startRecording();
+    }
+});
+
+// Автоотпускание при потере фокуса
+window.addEventListener('blur', function() {
+    if (isRecording) {
+        stopRecording();
+    }
+});
