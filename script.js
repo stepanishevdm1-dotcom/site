@@ -1,219 +1,294 @@
-// Конфигурация Firebase (ЗАМЕНИТЕ на свою!)
-const firebaseConfig = {
-    apiKey: "AIzaSyBq_07JyLmJgC3hNvK5Qd7W6qX2Z1Y8abcd",
-    authDomain: "soundbutton-12345.firebaseapp.com",
-    databaseURL: "https://soundbutton-12345-default-rtdb.firebaseio.com",
-    projectId: "soundbutton-12345",
-    storageBucket: "soundbutton-12345.appspot.com",
-    messagingSenderId: "123456789012",
-    appId: "1:123456789012:web:abcdef1234567890"
-};
-
-// Инициализация Firebase
-firebase.initializeApp(firebaseConfig);
-const database = firebase.database();
-
+// Глобальные переменные
 let currentRole = null;
 let currentRoom = null;
-let mediaRecorder = null;
-let audioChunks = [];
-let localStream = null;
-let isRecording = false;
+let githubToken = null;
+let gistId = null;
+let selectedSound = 'bell';
+let lastUpdateTime = null;
+let checkInterval = null;
+
+// Список звуков
+const sounds = {
+    'bell': { name: '🔔 Звонок', url: 'bell' },
+    'alert': { name: '🚨 Тревога', url: 'alert' },
+    'message': { name: '📬 Сообщение', url: 'message' },
+    'success': { name: '✅ Успех', url: 'success' },
+    'notify': { name: '📢 Уведомление', url: 'notify' },
+    'horn': { name: '📯 Горн', url: 'horn' }
+};
 
 // Выбор роли
 function selectRole(role) {
     currentRole = role;
     document.getElementById('roleSelection').classList.add('hidden');
-    document.getElementById('roomSelection').classList.remove('hidden');
-    
-    if (role === 'sender') {
-        // Запрашиваем доступ к микрофону заранее
-        navigator.mediaDevices.getUserMedia({ audio: true })
-            .then(stream => {
-                localStream = stream;
-                console.log("Микрофон доступен");
-            })
-            .catch(err => {
-                console.error("Ошибка микрофона:", err);
-                alert("Разрешите доступ к микрофону!");
-            });
-    }
+    document.getElementById('roomSetup').classList.remove('hidden');
 }
 
 // Подключиться к комнате
-function joinRoom() {
-    const roomCode = document.getElementById('roomCodeInput').value.trim();
-    if (!roomCode) {
-        alert('Введите код комнаты!');
+async function joinRoom() {
+    githubToken = document.getElementById('githubToken').value.trim();
+    currentRoom = document.getElementById('roomCode').value.trim();
+    
+    if (!githubToken || !githubToken.startsWith('ghp_')) {
+        alert('Введите корректный GitHub Token (начинается с ghp_)');
         return;
     }
     
-    currentRoom = roomCode;
-    document.getElementById('roomSelection').classList.add('hidden');
+    if (!currentRoom) {
+        alert('Введите код комнаты');
+        return;
+    }
     
-    if (currentRole === 'sender') {
-        document.getElementById('senderInterface').classList.remove('hidden');
-        document.getElementById('senderRoomCode').textContent = roomCode;
-        setupSender();
-    } else {
-        document.getElementById('receiverInterface').classList.remove('hidden');
-        document.getElementById('receiverRoomCode').textContent = roomCode;
-        setupReceiver();
+    document.getElementById('roomSetup').classList.add('hidden');
+    
+    try {
+        // Создаем или получаем Gist
+        gistId = await getOrCreateGist();
+        
+        if (currentRole === 'sender') {
+            document.getElementById('senderInterface').classList.remove('hidden');
+            document.getElementById('senderRoomCode').textContent = currentRoom;
+            document.getElementById('senderStatus').textContent = 'Готов к отправке звуков';
+        } else {
+            document.getElementById('receiverInterface').classList.remove('hidden');
+            document.getElementById('receiverRoomCode').textContent = currentRoom;
+            document.getElementById('receiverStatus').textContent = 'Слушаю обновления...';
+            
+            // Запускаем проверку обновлений
+            startCheckingForUpdates();
+        }
+        
+        console.log(`Подключен как ${currentRole} в комнате ${currentRoom}`);
+        
+    } catch (error) {
+        alert('Ошибка подключения: ' + error.message);
+        console.error(error);
     }
 }
 
-// Настройка отправителя
-function setupSender() {
-    // Слушаем подтверждения доставки
-    database.ref('rooms/' + currentRoom + '/delivery').on('value', (snapshot) => {
-        if (snapshot.exists()) {
-            const data = snapshot.val();
-            if (data.type === 'received') {
-                document.getElementById('recordingStatus').innerHTML = 
-                    '✅ Сообщение доставлено! ' + new Date().toLocaleTimeString();
+// Создать или получить Gist
+async function getOrCreateGist() {
+    const gistFilename = `sound_room_${currentRoom}.json`;
+    
+    try {
+        // Пробуем найти существующий Gist
+        const response = await fetch('https://api.github.com/gists', {
+            headers: {
+                'Authorization': `token ${githubToken}`,
+                'Accept': 'application/vnd.github.v3+json'
+            }
+        });
+        
+        const gists = await response.json();
+        
+        for (const gist of gists) {
+            if (gist.files[gistFilename]) {
+                console.log('Найден существующий Gist:', gist.id);
+                return gist.id;
             }
         }
-    });
-}
-
-// Настройка приёмника
-function setupReceiver() {
-    // Слушаем входящие голосовые сообщения
-    database.ref('rooms/' + currentRoom + '/audio').on('value', (snapshot) => {
-        if (snapshot.exists()) {
-            const audioData = snapshot.val();
-            playAudioMessage(audioData);
-            
-            // Подтверждаем получение
-            database.ref('rooms/' + currentRoom + '/delivery').set({
-                type: 'received',
-                timestamp: Date.now(),
-                from: audioData.senderId
-            });
-            
-            // Удаляем подтверждение через 2 секунды
-            setTimeout(() => {
-                database.ref('rooms/' + currentRoom + '/delivery').remove();
-            }, 2000);
-        }
-    });
-}
-
-// Начать запись (для отправителя)
-function startRecording() {
-    if (!localStream) {
-        alert('Микрофон не доступен!');
-        return;
-    }
-    
-    isRecording = true;
-    document.getElementById('signalBtn').innerHTML = '🎤<br>Говорите...';
-    document.getElementById('signalBtn').style.background = 'linear-gradient(135deg, #F44336, #B71C1C)';
-    document.getElementById('recordingStatus').innerHTML = '● Запись... Отпустите кнопку';
-    
-    // Начинаем запись
-    mediaRecorder = new MediaRecorder(localStream);
-    audioChunks = [];
-    
-    mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-            audioChunks.push(event.data);
-        }
-    };
-    
-    mediaRecorder.onstop = () => {
-        if (audioChunks.length > 0) {
-            sendAudioMessage();
-        }
-        resetButton();
-    };
-    
-    mediaRecorder.start();
-    
-    // Меняем кнопку на "отпустите"
-    const signalBtn = document.getElementById('signalBtn');
-    signalBtn.onmouseup = signalBtn.ontouchend = stopRecording;
-    signalBtn.onmouseleave = stopRecording;
-}
-
-// Остановить запись
-function stopRecording() {
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
-        mediaRecorder.stop();
-        isRecording = false;
-    }
-}
-
-// Сброс кнопки
-function resetButton() {
-    document.getElementById('signalBtn').innerHTML = '🎤<br>Говорить';
-    document.getElementById('signalBtn').style.background = 'linear-gradient(135deg, #FF5722, #D84315)';
-    
-    const signalBtn = document.getElementById('signalBtn');
-    signalBtn.onmouseup = signalBtn.ontouchend = null;
-    signalBtn.onmouseleave = null;
-}
-
-// Отправить голосовое сообщение
-function sendAudioMessage() {
-    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-    
-    const reader = new FileReader();
-    reader.readAsDataURL(audioBlob);
-    reader.onloadend = function() {
-        const base64Audio = reader.result;
         
-        // Отправляем в Firebase
-        database.ref('rooms/' + currentRoom + '/audio').set({
-            data: base64Audio,
-            timestamp: Date.now(),
-            senderId: generateId(),
-            duration: audioBlob.size
-        }).then(() => {
-            document.getElementById('recordingStatus').innerHTML = '⏳ Отправка...';
+        // Создаем новый Gist
+        const createResponse = await fetch('https://api.github.com/gists', {
+            method: 'POST',
+            headers: {
+                'Authorization': `token ${githubToken}`,
+                'Accept': 'application/vnd.github.v3+json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                description: `Sound Room: ${currentRoom}`,
+                public: true,
+                files: {
+                    [gistFilename]: {
+                        content: JSON.stringify({
+                            room: currentRoom,
+                            lastSound: null,
+                            lastUpdate: null,
+                            history: []
+                        }, null, 2)
+                    }
+                }
+            })
+        });
+        
+        const newGist = await createResponse.json();
+        console.log('Создан новый Gist:', newGist.id);
+        return newGist.id;
+        
+    } catch (error) {
+        throw new Error('Не удалось создать/найти Gist: ' + error.message);
+    }
+}
+
+// Выбор звука (для отправителя)
+function selectSound(soundId) {
+    selectedSound = soundId;
+    document.getElementById('selectedSoundName').textContent = sounds[soundId].name;
+    
+    // Подсветка выбранной кнопки
+    document.querySelectorAll('.sound-btn').forEach(btn => {
+        btn.style.opacity = '0.7';
+    });
+    event.target.style.opacity = '1';
+    event.target.style.boxShadow = '0 0 0 3px rgba(155, 89, 182, 0.5)';
+}
+
+// Отправить звук (для отправителя)
+async function sendSound() {
+    if (!gistId || !selectedSound) return;
+    
+    const soundName = sounds[selectedSound].name;
+    document.getElementById('senderStatus').innerHTML = `Отправка звука: ${soundName}...`;
+    document.getElementById('sendButton').disabled = true;
+    
+    try {
+        // Получаем текущий Gist
+        const gistResponse = await fetch(`https://api.github.com/gists/${gistId}`, {
+            headers: {
+                'Authorization': `token ${githubToken}`,
+                'Accept': 'application/vnd.github.v3+json'
+            }
+        });
+        
+        const gist = await gistResponse.json();
+        const gistFilename = `sound_room_${currentRoom}.json`;
+        const currentContent = JSON.parse(gist.files[gistFilename].content);
+        
+        // Обновляем данные
+        const now = new Date().toISOString();
+        const newData = {
+            room: currentRoom,
+            lastSound: selectedSound,
+            lastUpdate: now,
+            lastSender: 'Отправитель',
+            history: [...(currentContent.history || []), {
+                sound: selectedSound,
+                name: soundName,
+                time: now,
+                sender: 'Отправитель'
+            }].slice(-10) // Храним только последние 10 звуков
+        };
+        
+        // Обновляем Gist
+        const updateResponse = await fetch(`https://api.github.com/gists/${gistId}`, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `token ${githubToken}`,
+                'Accept': 'application/vnd.github.v3+json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                files: {
+                    [gistFilename]: {
+                        content: JSON.stringify(newData, null, 2)
+                    }
+                }
+            })
+        });
+        
+        if (updateResponse.ok) {
+            document.getElementById('senderStatus').innerHTML = 
+                `✅ Звук "${soundName}" отправлен!<br><small>${new Date().toLocaleTimeString()}</small>`;
             
-            // Очищаем через 5 секунд
+            // Воспроизводим звук локально (для обратной связи)
+            playSound(selectedSound);
+            
+            // Ждем немного и сбрасываем статус
             setTimeout(() => {
-                database.ref('rooms/' + currentRoom + '/audio').remove();
-            }, 5000);
-        });
-    };
+                document.getElementById('senderStatus').textContent = 'Готов к отправке';
+                document.getElementById('sendButton').disabled = false;
+            }, 3000);
+            
+        } else {
+            throw new Error('Ошибка обновления Gist');
+        }
+        
+    } catch (error) {
+        document.getElementById('senderStatus').textContent = '❌ Ошибка отправки: ' + error.message;
+        document.getElementById('sendButton').disabled = false;
+        console.error(error);
+    }
 }
 
-// Воспроизвести сообщение (для приёмника)
-function playAudioMessage(audioData) {
-    const audioElement = document.getElementById('receiverAudio');
-    audioElement.src = audioData.data;
+// Начать проверку обновлений (для приёмника)
+function startCheckingForUpdates() {
+    // Проверяем сразу при запуске
+    checkForUpdates();
     
-    document.getElementById('messageStatus').innerHTML = 
-        '🔔 Новое сообщение! ' + new Date().toLocaleTimeString();
+    // Затем каждые 5 секунд
+    checkInterval = setInterval(checkForUpdates, 5000);
+}
+
+// Проверить обновления (для приёмника)
+async function checkForUpdates() {
+    if (!gistId) return;
     
-    // Автовоспроизведение
-    audioElement.onloadeddata = function() {
+    try {
+        const response = await fetch(`https://api.github.com/gists/${gistId}`, {
+            headers: {
+                'Accept': 'application/vnd.github.v3+json'
+            }
+        });
+        
+        if (!response.ok) throw new Error('Не удалось получить Gist');
+        
+        const gist = await response.json();
+        const gistFilename = `sound_room_${currentRoom}.json`;
+        
+        if (!gist.files[gistFilename]) {
+            throw new Error('Файл комнаты не найден');
+        }
+        
+        const data = JSON.parse(gist.files[gistFilename].content);
+        
+        // Если есть новое обновление
+        if (data.lastUpdate && data.lastUpdate !== lastUpdateTime && data.lastSound) {
+            lastUpdateTime = data.lastUpdate;
+            
+            // Обновляем статус
+            const soundName = sounds[data.lastSound]?.name || data.lastSound;
+            const time = new Date(data.lastUpdate).toLocaleTimeString();
+            
+            document.getElementById('receiverStatus').innerHTML = 
+                `🔔 Новый звук: ${soundName}<br><small>${time}</small>`;
+            
+            document.getElementById('lastMessage').innerHTML = 
+                `<div style="background:#e1f5fe; padding:10px; border-radius:8px; margin:10px 0;">
+                    <strong>Получено:</strong> ${soundName}<br>
+                    <small>Время: ${time}</small>
+                </div>`;
+            
+            // Воспроизводим звук
+            playSound(data.lastSound);
+        }
+        
+    } catch (error) {
+        console.error('Ошибка проверки:', error);
+        document.getElementById('receiverStatus').textContent = '❌ Ошибка проверки обновлений';
+    }
+}
+
+// Воспроизвести звук
+function playSound(soundId) {
+    const audioElement = document.getElementById(`sound-${soundId}`);
+    if (audioElement) {
+        audioElement.currentTime = 0;
         audioElement.play().catch(e => {
-            // Если автовоспроизведение заблокировано
-            document.getElementById('messageStatus').innerHTML += 
-                '<br>Нажмите play для прослушивания';
+            console.log('Автовоспроизведение заблокировано');
         });
-    };
+    }
 }
 
-// Генератор ID
-function generateId() {
-    return Math.random().toString(36).substr(2, 9);
-}
-
-// Обработка касаний на мобильных
-document.getElementById('signalBtn').addEventListener('touchstart', function(e) {
-    if (currentRole === 'sender' && !isRecording) {
-        e.preventDefault();
-        startRecording();
+// Очистка при закрытии (для приёмника)
+window.addEventListener('beforeunload', function() {
+    if (checkInterval) {
+        clearInterval(checkInterval);
     }
 });
 
-// Автоотпускание при потере фокуса
-window.addEventListener('blur', function() {
-    if (isRecording) {
-        stopRecording();
-    }
-});
+// Инициализация
+window.onload = function() {
+    // Выбираем первый звук по умолчанию
+    selectSound('bell');
+};
