@@ -1,196 +1,179 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>GitHub Sound Button</title>
+    <title>Голосовая Кнопка</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f0f8ff; }
-        .container { max-width: 600px; margin: 0 auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
-        h2 { color: #2c3e50; margin-bottom: 10px; }
-        h3 { color: #34495e; margin: 20px 0 10px; }
+        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 500px; margin: 0 auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
         
+        /* Кнопки ролей */
         .role-btn {
-            display: block;
-            width: 100%;
-            padding: 25px;
-            margin: 15px 0;
-            font-size: 22px;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            color: white;
-            font-weight: bold;
-            transition: all 0.3s;
+            display: block; width: 100%; padding: 25px; margin: 15px 0;
+            font-size: 22px; border: none; border-radius: 12px; cursor: pointer;
+            color: white; font-weight: bold; transition: all 0.3s;
         }
-        .role-btn:hover { transform: scale(1.02); opacity: 0.9; }
         #senderBtn { background: linear-gradient(135deg, #3498db, #2980b9); }
         #receiverBtn { background: linear-gradient(135deg, #2ecc71, #27ae60); }
         
+        /* Скрытые блоки */
         .hidden { display: none; }
         
-        .sound-btn {
-            padding: 18px;
-            margin: 8px;
-            width: 45%;
-            background: linear-gradient(135deg, #9b59b6, #8e44ad);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: all 0.2s;
-        }
-        .sound-btn:hover { background: linear-gradient(135deg, #8e44ad, #732d91); transform: translateY(-2px); }
-        
-        #sendButton {
-            padding: 25px 40px;
-            font-size: 24px;
-            background: linear-gradient(135deg, #e74c3c, #c0392b);
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 120px;
-            height: 120px;
-            margin: 25px auto;
-            cursor: pointer;
-            display: block;
-            box-shadow: 0 8px 15px rgba(231, 76, 60, 0.3);
-        }
-        
+        /* Статусы */
         .status-box {
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 10px;
-            background: #ecf0f1;
-            border-left: 5px solid #3498db;
+            padding: 15px; margin: 20px 0; border-radius: 10px;
+            background: #ecf0f1; border-left: 5px solid #3498db;
             text-align: left;
         }
         
-        audio { width: 100%; margin: 15px 0; border-radius: 10px; }
-        
-        .setup-box {
-            background: #fffde7;
-            padding: 20px;
-            border-radius: 10px;
-            margin: 20px 0;
-            border: 2px dashed #f39c12;
+        /* Кнопки звуков */
+        .sound-btn {
+            padding: 15px; margin: 8px; width: 45%;
+            background: linear-gradient(135deg, #9b59b6, #8e44ad);
+            color: white; border: none; border-radius: 8px;
+            cursor: pointer; font-size: 16px;
         }
         
+        /* Главная кнопка отправки */
+        #sendButton {
+            padding: 25px 40px; font-size: 24px;
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white; border: none; border-radius: 50%;
+            width: 120px; height: 120px; margin: 25px auto;
+            cursor: pointer; display: block;
+        }
+        
+        /* Аудио плеер */
+        audio { width: 100%; margin: 15px 0; border-radius: 10px; }
+        
+        /* Инструкция по токену */
+        .token-instruction {
+            background: #fff3cd; padding: 20px; border-radius: 10px;
+            margin: 20px 0; border: 2px dashed #ffc107;
+            text-align: left;
+        }
+        
+        /* Поле ввода */
         input {
-            padding: 15px;
-            width: 80%;
-            font-size: 18px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
+            padding: 15px; width: 80%; font-size: 18px;
+            border: 2px solid #ddd; border-radius: 8px;
             margin: 10px 0;
         }
         
-        select {
-            padding: 12px;
-            font-size: 16px;
-            border: 2px solid #3498db;
-            border-radius: 8px;
-            margin: 10px;
-            width: 80%;
+        /* Кнопка подключения */
+        .connect-btn {
+            padding: 15px 30px; background: #2ecc71;
+            color: white; border: none; border-radius: 8px;
+            font-size: 18px; margin: 15px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>🔊 GitHub Sound Messenger</h2>
-        <p>Работает через GitHub Gist API (задержка 5-10 секунд)</p>
+        <h1>🔊 Голосовая Кнопка через GitHub</h1>
+        <p>Работает через GitHub Gist API</p>
         
-        <div id="roleSelection">
-            <h3>Выберите роль:</h3>
+        <!-- Шаг 1: Выбор роли -->
+        <div id="step1">
+            <h2>Шаг 1: Выберите роль</h2>
             <button class="role-btn" onclick="selectRole('sender')" id="senderBtn">
                 📤 ОТПРАВИТЕЛЬ<br>
-                <small>Кнопка + выбор звука</small>
+                <small>(Записывает и отправляет голос)</small>
             </button>
             
             <button class="role-btn" onclick="selectRole('receiver')" id="receiverBtn">
                 📥 ПРИЁМНИК<br>
-                <small>Только прослушивание</small>
+                <small>(Только слушает)</small>
             </button>
         </div>
         
-        <!-- НАСТРОЙКА КОМНАТЫ -->
-        <div id="roomSetup" class="hidden">
-            <div class="setup-box">
-                <h3>Настройка комнаты</h3>
-                <p>⚠️ Вам нужен GitHub Personal Access Token</p>
-                <ol style="text-align: left; padding-left: 20px;">
-                    <li>Зайдите на <a href="https://github.com/settings/tokens" target="_blank">GitHub Tokens</a></li>
-                    <li>Нажмите "Generate new token (classic)"</li>
-                    <li>Отметьте "gist" и нажмите "Generate"</li>
-                    <li>Скопируйте токен и вставьте ниже</li>
+        <!-- Шаг 2: Получение токена -->
+        <div id="step2" class="hidden">
+            <h2>Шаг 2: Получите GitHub Token</h2>
+            <div class="token-instruction">
+                <h3>✅ Как получить токен:</h3>
+                <ol>
+                    <li><strong>Откройте</strong> <a href="https://github.com/settings/tokens" target="_blank" style="color: #0366d6; text-decoration: underline;">GitHub Tokens</a></li>
+                    <li><strong>Нажмите</strong> "Generate new token" → "Generate new token (classic)"</li>
+                    <li><strong>Введите название</strong>: "Sound Button App"</li>
+                    <li><strong>Отметьте только</strong>: <code>✓ gist</code> (галочка)</li>
+                    <li><strong>Нажмите</strong> "Generate token" внизу</li>
+                    <li><strong>Скопируйте</strong> токен (начинается с <code>ghp_</code>)</li>
                 </ol>
-                
-                <input type="text" id="githubToken" placeholder="Ваш GitHub Token (начинается с ghp_)">
-                <br>
-                <input type="text" id="roomCode" placeholder="Код комнаты (например: sound123)" value="sound123">
-                <br><br>
-                <button onclick="joinRoom()" style="padding: 15px 30px; background: #2ecc71; color: white; border: none; border-radius: 8px; font-size: 18px;">
-                    Подключиться к комнате
-                </button>
+                <p style="color: #d73a49; font-weight: bold;">⚠️ Сохраните токен! Он покажется только один раз.</p>
             </div>
+            
+            <h3>Введите ваш токен:</h3>
+            <input type="text" id="githubToken" placeholder="ghp_abc123..." style="font-family: monospace;">
+            <br>
+            <input type="text" id="roomCode" placeholder="Название комнаты (например: myroom123)" value="soundroom1">
+            <br><br>
+            <button class="connect-btn" onclick="saveToken()">💾 Сохранить токен</button>
+            <p id="tokenStatus" style="color: #666; margin-top: 10px;"></p>
         </div>
         
-        <!-- ИНТЕРФЕЙС ОТПРАВИТЕЛЯ -->
+        <!-- Интерфейс Отправителя -->
         <div id="senderInterface" class="hidden">
             <div class="status-box">
-                <strong>📤 ОТПРАВИТЕЛЬ</strong><br>
-                Комната: <span id="senderRoomCode" style="font-weight:bold;">-</span><br>
-                <span id="senderStatus">Готов к отправке</span>
+                <strong>📤 РЕЖИМ ОТПРАВИТЕЛЯ</strong><br>
+                Комната: <span id="senderRoom">soundroom1</span><br>
+                Статус: <span id="senderStatus">Микрофон доступен</span>
             </div>
             
-            <h3>Выберите звук:</h3>
-            <div id="soundSelection">
-                <button class="sound-btn" onclick="selectSound('bell')">🔔 Звонок</button>
-                <button class="sound-btn" onclick="selectSound('alert')">🚨 Тревога</button>
-                <button class="sound-btn" onclick="selectSound('message')">📬 Сообщение</button>
-                <button class="sound-btn" onclick="selectSound('success')">✅ Успех</button>
-                <button class="sound-btn" onclick="selectSound('notify')">📢 Уведомление</button>
-                <button class="sound-btn" onclick="selectSound('horn')">📯 Горн</button>
+            <h3>🎤 Запись голоса:</h3>
+            <button id="recordBtn" onclick="startRecording()" style="padding: 20px; background: #e74c3c; color: white; border: none; border-radius: 10px; font-size: 18px;">
+                🔴 НАЖМИТЕ ДЛЯ ЗАПИСИ
+            </button>
+            <button id="stopBtn" onclick="stopRecording()" class="hidden" style="padding: 20px; background: #e67e22; color: white; border: none; border-radius: 10px; font-size: 18px;">
+                ⏹️ ОСТАНОВИТЬ
+            </button>
+            
+            <div id="recordingStatus" style="margin: 15px; padding: 10px; background: #ffeaa7; border-radius: 8px;"></div>
+            
+            <h3>🔊 Тестовые звуки:</h3>
+            <div>
+                <button class="sound-btn" onclick="playTestSound('bell')">🔔 Звонок</button>
+                <button class="sound-btn" onclick="playTestSound('alert')">🚨 Тревога</button>
+                <button class="sound-btn" onclick="playTestSound('message')">📬 Уведомление</button>
             </div>
             
-            <p>Выбран: <strong id="selectedSoundName">🔔 Звонок</strong></p>
+            <audio id="previewAudio" controls style="margin-top: 20px;"></audio>
             
-            <button id="sendButton" onclick="sendSound()">ОТПРАВИТЬ</button>
-            
-            <div style="margin-top: 30px; padding: 15px; background: #e8f4f8; border-radius: 10px;">
-                <strong>Как работает:</strong><br>
-                1. Выберите звук → 2. Нажмите кнопку → 3. Звук сохраняется в GitHub Gist<br>
-                4. Приёмник автоматически обнаружит и воспроизведёт его
+            <div style="margin-top: 30px; padding: 15px; background: #d6eaf8; border-radius: 10px;">
+                <strong>ℹ️ Как работает:</strong><br>
+                1. Нажмите кнопку и говорите в микрофон<br>
+                2. Отпустите кнопку - запись отправится<br>
+                3. Приёмник получит её через 5-10 секунд
             </div>
         </div>
         
-        <!-- ИНТЕРФЕЙС ПРИЁМНИКА -->
+        <!-- Интерфейс Приёмника -->
         <div id="receiverInterface" class="hidden">
             <div class="status-box">
-                <strong>📥 ПРИЁМНИК</strong><br>
-                Комната: <span id="receiverRoomCode" style="font-weight:bold;">-</span><br>
-                <span id="receiverStatus">Слушаю обновления...</span>
+                <strong>📥 РЕЖИМ ПРИЁМНИКА</strong><br>
+                Комната: <span id="receiverRoom">soundroom1</span><br>
+                Статус: <span id="receiverStatus">Ожидание сообщений...</span>
             </div>
             
-            <h3>📢 Полученные звуки:</h3>
-            <audio id="receivedAudio" controls></audio>
-            <div id="lastMessage"></div>
+            <h3>📢 Полученные сообщения:</h3>
+            <audio id="receivedAudio" controls autoplay></audio>
+            <div id="lastMessageTime" style="color: #666; margin: 10px;"></div>
             
-            <div style="margin-top: 30px; padding: 15px; background: #e8f5e9; border-radius: 10px;">
-                <strong>Режим:</strong> Только прослушивание<br>
-                <small>Микрофон не используется, динамик воспроизводит полученные звуки</small><br><br>
-                🔄 Автопроверка каждые 5 секунд
+            <div id="messageHistory" style="text-align: left; margin: 20px 0; max-height: 300px; overflow-y: auto;"></div>
+            
+            <div style="margin-top: 30px; padding: 15px; background: #d5f4e6; border-radius: 10px;">
+                <strong>✅ Режим приёмника:</strong><br>
+                • Микрофон <strong>НЕ используется</strong><br>
+                • Динамик воспроизводит полученные сообщения<br>
+                • Автопроверка каждые 5 секунд
             </div>
         </div>
     </div>
 
-    <!-- ЗВУКИ (скрытые) -->
-    <audio id="sound-bell" src="https://assets.mixkit.co/sfx/preview/mixkit-bell-notification-933.mp3" preload="auto"></audio>
-    <audio id="sound-alert" src="https://assets.mixkit.co/sfx/preview/mixkit-retro-game-emergency-alarm-1000.mp3" preload="auto"></audio>
-    <audio id="sound-message" src="https://assets.mixkit.co/sfx/preview/mixkit-message-pop-alert-2354.mp3" preload="auto"></audio>
-    <audio id="sound-success" src="https://assets.mixkit.co/sfx/preview/mixkit-winning-chimes-2015.mp3" preload="auto"></audio>
-    <audio id="sound-notify" src="https://assets.mixkit.co/sfx/preview/mixkit-correct-answer-tone-2870.mp3" preload="auto"></audio>
-    <audio id="sound-horn" src="https://assets.mixkit.co/sfx/preview/mixkit-car-horn-718.mp3" preload="auto"></audio>
+    <!-- Скрытые аудио элементы для тестовых звуков -->
+    <audio id="sound-bell" src="https://assets.mixkit.co/sfx/preview/mixkit-bell-notification-933.mp3"></audio>
+    <audio id="sound-alert" src="https://assets.mixkit.co/sfx/preview/mixkit-retro-game-emergency-alarm-1000.mp3"></audio>
+    <audio id="sound-message" src="https://assets.mixkit.co/sfx/preview/mixkit-message-pop-alert-2354.mp3"></audio>
 
     <script src="script.js"></script>
 </body>
